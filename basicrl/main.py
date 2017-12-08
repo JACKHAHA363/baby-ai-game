@@ -82,12 +82,7 @@ def main():
 
     obs_numel = reduce(operator.mul, obs_shape, 1)
 
-    if len(obs_shape) == 3 and obs_numel > 1024:
-        actor_critic = CNNPolicy(obs_shape[0], envs.action_space, args.recurrent_policy)
-    else:
-        assert not args.recurrent_policy, \
-            "Recurrent policy is not implemented for the MLP controller"
-        actor_critic = MLPPolicy(obs_numel, envs.action_space)
+    actor_critic = MLPPolicy(obs_numel, envs.action_space)
 
     if envs.action_space.__class__.__name__ == "Discrete":
         action_shape = 1

@@ -338,10 +338,20 @@ class FetchEnv(AIGameEnv):
 
     def __init__(
         self,
-        size=8,
-        numObjs=3):
+        size=6,
+        numObjs=2):
         self.numObjs = numObjs
         super(FetchEnv, self).__init__(gridSize=size, maxSteps=5*size)
+
+        self.observation_space = spaces.Box(
+            low=0,
+            high=255,
+            #shape=(OBS_ARRAY_SIZE[0] * OBS_ARRAY_SIZE[1] * OBS_ARRAY_SIZE[2] + 128,)
+            shape=(OBS_ARRAY_SIZE[0] * OBS_ARRAY_SIZE[1] * OBS_ARRAY_SIZE[2], 1, 2)
+        )
+
+        #print('obs space shape')
+        print(self.observation_space.shape)
 
     def _genGrid(self, width, height):
         assert width == height
@@ -356,7 +366,8 @@ class FetchEnv(AIGameEnv):
             grid.set(0, j, Wall())
             grid.set(width-1, j, Wall())
 
-        types = ['key', 'ball']
+        #types = ['key', 'ball']
+        types = ['key']
         colors = list(COLORS.keys())
 
         objs = []
@@ -388,6 +399,9 @@ class FetchEnv(AIGameEnv):
         self.targetType = target.type
         self.targetColor = target.color
 
+
+
+
         descStr = '%s %s' % (self.targetColor, self.targetType)
 
         # Generate the mission string
@@ -404,17 +418,32 @@ class FetchEnv(AIGameEnv):
             self.mission = 'you must fetch a %s' % descStr
         assert hasattr(self, 'mission')
 
+        self.mission = descStr
+
         return grid
 
+    def _encodeMission(self, obs):
+
+        obs = obs.reshape(-1, 1, 1)
+
+        strArray = np.zeros(shape=obs.shape)
+        mission = self.mission
+        assert len(mission) < strArray.shape[0]
+
+        for i in range(0, len(mission)):
+            ch = ord(mission[i])
+            strArray[i][0][0] = ch
+
+        obs = np.stack([obs, strArray], axis=2)
+
+        return obs
+
     def _reset(self):
+        import random
+        self._seed(random.randint(0, 0xFFFFFFFF))
+
         obs = AIGameEnv._reset(self)
-
-        obs = {
-            'image': obs,
-            'mission': self.mission,
-            'advice' : ''
-        }
-
+        obs = self._encodeMission(obs)
         return obs
 
     def _step(self, action):
@@ -428,12 +457,9 @@ class FetchEnv(AIGameEnv):
             else:
                 reward = -1000
                 done = True
+            #reward = 1000
 
-        obs = {
-            'image': obs,
-            'mission': self.mission,
-            'advice': ''
-        }
+        obs = self._encodeMission(obs)
 
         return obs, reward, done, info
 

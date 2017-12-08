@@ -259,9 +259,9 @@ class AIGameWindow(QMainWindow):
         self.imgLabel.setPixmap(pixmap)
 
         # Render and display the agent's view
-        image = obs['image']
-        obsPixmap = unwrapped.getObsRender(image)
-        self.obsImgLabel.setPixmap(obsPixmap)
+        #image = obs['image']
+        #obsPixmap = unwrapped.getObsRender(image)
+        #self.obsImgLabel.setPixmap(obsPixmap)
 
         # Set the steps remaining displayadvice
         stepsRem = unwrapped.getStepsRemaining()

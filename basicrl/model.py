@@ -3,6 +3,7 @@ from functools import reduce
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Variable
 from distributions import Categorical, DiagGaussian
 from utils import orthogonal
 
@@ -127,12 +128,19 @@ class MLPPolicy(FFPolicy):
 
         self.action_space = action_space
 
+        print('num_inputs=%s' % num_inputs)
+        #num_inputs = num_inputs // 2
+
+        #self.rnn = nn.GRUCell(1, 147)
+
         self.a_fc1 = nn.Linear(num_inputs, 64)
         self.a_fc2 = nn.Linear(64, 64)
+        self.a_fc3 = nn.Linear(64, 64)
 
         self.v_fc1 = nn.Linear(num_inputs, 64)
         self.v_fc2 = nn.Linear(64, 64)
-        self.v_fc3 = nn.Linear(64, 1)
+        self.v_fc3 = nn.Linear(64, 64)
+        self.v_fc4 = nn.Linear(64, 1)
 
         if action_space.__class__.__name__ == "Discrete":
             num_outputs = action_space.n
@@ -155,32 +163,79 @@ class MLPPolicy(FFPolicy):
 
         """
         tanh_gain = nn.init.calculate_gain('tanh')
-        self.a_fc1.weight.data.mul_(tanh_gain)
-        self.a_fc2.weight.data.mul_(tanh_gain)
-        self.v_fc1.weight.data.mul_(tanh_gain)
-        self.v_fc2.weight.data.mul_(tanh_gain)
+        relu_gain = nn.init.calculate_gain('relu')
+        self.a_fc1.weight.data.mul_(relu_gain)
+        self.a_fc2.weight.data.mul_(relu_gain)
+        self.v_fc1.weight.data.mul_(relu_gain)
+        self.v_fc2.weight.data.mul_(relu_gain)
+        """
+
+        """
+        if hasattr(self, 'rnn'):
+            orthogonal(self.rnn.weight_ih.data)
+            orthogonal(self.rnn.weight_hh.data)
+            self.rnn.bias_ih.data.fill_(0)
+            self.rnn.bias_hh.data.fill_(0)
         """
 
         if self.dist.__class__.__name__ == "DiagGaussian":
             self.dist.fc_mean.weight.data.mul_(0.01)
 
     def forward(self, inputs, states, masks):
+
+        inputs = inputs / 255
+
+        text = inputs[:, :, :, 1].contiguous()
+        inputs = inputs[:, :, :, 0].contiguous()
+        batch_size = inputs.size()[0]
+
         batch_numel = reduce(operator.mul, inputs.size()[1:], 1)
         inputs = inputs.view(-1, batch_numel)
 
+
+
+        """
+        text = text.view(-1, batch_numel)
+
+        strLen = text.size()[1]
+        hidden = Variable(torch.zeros(batch_size, 147))
+        for i in range(24):
+            ch = int( text[1, i].data.numpy() )
+            if ch != 0:
+                print(chr( ch  ))
+            batch_ch = text[:, i:(i+1)]
+            hidden = self.rnn(batch_ch, hidden)
+
+        # Passing text directly doesn't work
+        inputs = torch.cat([text, inputs], dim=1)
+
+        # Doesn't work
+        #inputs = torch.cat([hidden, inputs], dim=1)
+        #print(inputs.size())
+        """
+
+        text = text.view(-1, batch_numel)
+
+        inputs = torch.cat([text, inputs], dim=1)
+
+
+
+
+
         x = self.v_fc1(inputs)
         x = F.tanh(x)
-
         x = self.v_fc2(x)
         x = F.tanh(x)
-
         x = self.v_fc3(x)
+        x = F.tanh(x)
+        x = self.v_fc4(x)
         value = x
 
         x = self.a_fc1(inputs)
         x = F.tanh(x)
-
         x = self.a_fc2(x)
+        x = F.tanh(x)
+        x = self.a_fc3(x)
         x = F.tanh(x)
 
         return value, x, states
